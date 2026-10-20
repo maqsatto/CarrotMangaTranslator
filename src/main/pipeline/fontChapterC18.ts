@@ -4,7 +4,10 @@ import { z } from "zod";
 import type { AppPaths } from "../appPaths";
 import type { TranslationOptions } from "../appSettings";
 import { supportsChapterFontLanguagePair } from "../../shared/fontChapterSourcePolicy";
-import { prepareFontChapterRuntime } from "./fontChapterRuntimeAssets";
+import {
+  isFontChapterRuntimeSupported,
+  prepareFontChapterRuntime,
+} from "./fontChapterRuntimeAssets";
 import {
   buildFontChapterC18Input,
   fontChapterItemIdentity,
@@ -23,6 +26,8 @@ import { logPipelineInfo } from "./pipelineLogger";
 import { withFontChapterC18Worker } from "./fontChapterC18Lifecycle";
 import { runLocalInference } from "../runtimeSupport/localInferenceSection";
 import { prepareFontGlyphVerificationAssets } from "./fontGlyphVerificationAssets";
+
+let unsupportedPlatformLogged = false;
 
 const resultSchema = z.object({
   version: z.literal("c23.0"),
@@ -50,6 +55,16 @@ async function prepareChapter(
   entries: readonly FontChapterC18Page[],
   signal: AbortSignal,
 ): Promise<FontChapterC18Resolver | undefined> {
+  if (!isFontChapterRuntimeSupported()) {
+    if (!unsupportedPlatformLogged) {
+      unsupportedPlatformLogged = true;
+      logPipelineInfo("Automatic font matching is disabled on this platform", {
+        platform: process.platform,
+        arch: process.arch,
+      });
+    }
+    return undefined;
+  }
   const selected = entries.filter(
     ({ pageOptions: o }) =>
       o.autoFontMatching &&

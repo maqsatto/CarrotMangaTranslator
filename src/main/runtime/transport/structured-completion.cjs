@@ -100,17 +100,120 @@ async function requestApiStructuredChatCompletion(
       requestStartedAt,
     );
   } catch (error) {
-    const fallbackBody = buildJsonObjectFallback(options, requestBody, error);
-    if (!fallbackBody) throw error;
-    requestSummary.structuredOutputFallback = "json_object";
-    return requestChatCompletionWithKeyRetry(
+    // A local OpenAI-compatible endpoint can expose a text-only model while
+    // the page workflow normally supplies image context. Retry once without
+    // image parts so OCR text and block geometry remain usable instead of
+    // failing the whole page on an otherwise valid text model.
+    const textOnlyBody = buildTextOnlyRequestBody(requestBody, error);
+    if (textOnlyBody) {
+      requestSummary.imageInputFallback = "text-only";
+      try {
+        return await requestChatCompletionWithKeyRetry(
+          server,
+          options,
+          textOnlyBody,
+          requestSummary,
+          requestStartedAt,
+        );
+      } catch (textOnlyError) {
+        return requestWithJsonObjectFallback(
+          server,
+          options,
+          textOnlyBody,
+          requestSummary,
+          requestStartedAt,
+          textOnlyError,
+        );
+      }
+    }
+    return requestWithJsonObjectFallback(
       server,
       options,
-      fallbackBody,
+      requestBody,
       requestSummary,
       requestStartedAt,
+      error,
     );
   }
+}
+
+/** @param {Record<string,unknown>} requestBody @param {unknown} error */
+function buildTextOnlyRequestBody(requestBody, error) {
+  if (!isUnsupportedImageError(error)) return null;
+  const messages = Array.isArray(requestBody.messages)
+    ? requestBody.messages
+    : null;
+  if (!messages) return null;
+  let removed = false;
+  const textOnlyMessages = messages.map((message) => {
+    if (!message || typeof message !== "object" || Array.isArray(message)) {
+      return message;
+    }
+    const content = Array.isArray(message.content)
+      ? /** @type {unknown[]} */ (message.content)
+      : null;
+    if (!content) return message;
+    const textOnlyContent = content.filter((part) => {
+      if (!part || typeof part !== "object" || Array.isArray(part)) return true;
+      const record = /** @type {Record<string,unknown>} */ (part);
+      if (record.type === "image_url") {
+        removed = true;
+        return false;
+      }
+      // Image descriptions accompany the removed image parts and describe
+      // pixels the text-only model cannot see.
+      if (
+        record.type === "text" &&
+        /^Image \d+:/.test(String(record.text ?? ""))
+      ) {
+        removed = true;
+        return false;
+      }
+      return true;
+    });
+    return { ...message, content: textOnlyContent };
+  });
+  return removed ? { ...requestBody, messages: textOnlyMessages } : null;
+}
+
+/** @param {unknown} error */
+function isUnsupportedImageError(error) {
+  const detail = readErrorRecord(error);
+  if (detail.apiFailureKind === "unsupported-image") return true;
+  const preview = `${String(detail.message ?? "")}\n${String(detail.rawTextPreview ?? "")}`;
+  return (
+    (detail.status === 400 || detail.status === 415 || detail.status === 422) &&
+    /image|vision|multimodal/i.test(preview) &&
+    /not support|unsupported|does not support|reject/i.test(preview)
+  );
+}
+
+/**
+ * @param {ModelServer} server
+ * @param {StructuredOptions} options
+ * @param {Record<string,unknown>} requestBody
+ * @param {RequestSummary} requestSummary
+ * @param {number} requestStartedAt
+ * @param {unknown} error
+ */
+async function requestWithJsonObjectFallback(
+  server,
+  options,
+  requestBody,
+  requestSummary,
+  requestStartedAt,
+  error,
+) {
+  const fallbackBody = buildJsonObjectFallback(options, requestBody, error);
+  if (!fallbackBody) throw error;
+  requestSummary.structuredOutputFallback = "json_object";
+  return requestChatCompletionWithKeyRetry(
+    server,
+    options,
+    fallbackBody,
+    requestSummary,
+    requestStartedAt,
+  );
 }
 
 /**
@@ -183,5 +286,6 @@ function readErrorRecord(value) {
 
 module.exports = {
   buildJsonObjectFallback,
+  buildTextOnlyRequestBody,
   requestStructuredCompletion,
 };

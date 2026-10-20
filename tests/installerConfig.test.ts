@@ -260,8 +260,12 @@ describe("Windows installer clean uninstall option", () => {
         requestedPlatform: "darwin",
       }),
     ).toMatchObject({ platform: "darwin", arch: "arm64" });
-    expect(() => resolveTargetRuntime({ hostPlatform: "linux" })).toThrow(
-      "supports only win32 x64 and darwin arm64",
+    expect(resolveTargetRuntime({ hostPlatform: "linux" })).toMatchObject({
+      platform: "linux",
+      arch: "x64",
+    });
+    expect(() => resolveTargetRuntime({ hostPlatform: "freebsd" })).toThrow(
+      "supports only win32 x64, darwin arm64, and linux x64",
     );
     expect(() =>
       resolveTargetRuntime({

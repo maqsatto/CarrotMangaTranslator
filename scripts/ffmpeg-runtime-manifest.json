@@ -20,6 +20,10 @@
       "binary": "ffmpeg",
       "binaryBytes": 66332880,
       "binarySha256": "2e11c6f90993cdb79fff84d3f90044d28316b310e75b3e030cfc9a54f2c9d384"
+    },
+    "linux-x64": {
+      "system": true,
+      "binary": "ffmpeg"
     }
   }
 }

@@ -26,6 +26,7 @@ const appPaths = makeAppPaths();
 describe("selected inpainting model routing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(process, "platform", "get").mockReturnValue("win32");
     disposeFlux.mockResolvedValue(false);
     disposeKoharu.mockResolvedValue(false);
   });
@@ -59,6 +60,33 @@ describe("selected inpainting model routing", () => {
       expect(dispose).toHaveBeenCalledWith("workload-complete");
     },
   );
+
+  it("uses one Linux LaMa worker for a stage and releases it at stage exit", async () => {
+    vi.spyOn(process, "platform", "get").mockReturnValue("linux");
+    const native = makeLease("lama-manga");
+    const acquireLama = vi.fn().mockResolvedValue(native);
+    const disposeLama = vi.fn().mockResolvedValue(true);
+    await withModelWorkload(
+      "inpainting",
+      new AbortController().signal,
+      async () => {
+        for (let i = 0; i < 3; i++) {
+          const lease = await acquireInpaintingEngine(
+            { appPaths, model: "lama-manga" },
+            { ...dependencies, acquireLama, disposeLama },
+          );
+          expect(lease.engine).toBe(native.engine);
+          await lease.release();
+          expect(disposeLama).not.toHaveBeenCalled();
+        }
+      },
+    );
+    expect(acquireLama).toHaveBeenCalledOnce();
+    expect(acquireFlux).not.toHaveBeenCalled();
+    expect(acquireKoharu).not.toHaveBeenCalled();
+    expect(native.release).toHaveBeenCalledOnce();
+    expect(disposeLama).toHaveBeenCalledExactlyOnceWith("workload-complete");
+  });
 
   it("uses only Flux when Flux is selected", async () => {
     const fluxLease = makeLease("flux-klein");

@@ -100,16 +100,17 @@ function resolveTargetRuntime(options = {}) {
   if (
     requestedPlatform !== undefined &&
     requestedPlatform !== "win32" &&
-    requestedPlatform !== "darwin"
+    requestedPlatform !== "darwin" &&
+    requestedPlatform !== "linux"
   ) {
     throw new Error(
       `Unsupported MGT_TARGET_PLATFORM for native ONNX Runtime: ${requestedPlatform}`,
     );
   }
   const platform = requestedPlatform ?? hostPlatform;
-  if (platform !== "win32" && platform !== "darwin") {
+  if (platform !== "win32" && platform !== "darwin" && platform !== "linux") {
     throw new Error(
-      `Native ONNX Runtime packaging supports only win32 x64 and darwin arm64, received ${platform}.`,
+      `Native ONNX Runtime packaging supports only win32 x64, darwin arm64, and linux x64, received ${platform}.`,
     );
   }
   const arch = platform === "darwin" ? "arm64" : "x64";

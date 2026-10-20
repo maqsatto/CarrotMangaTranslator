@@ -56,6 +56,8 @@ describe("approved C23 runtime binding", () => {
       await expect(
         prepareFontChapterRuntime({
           paths: { dataRoot: "unused", runtimeDir: "unused" },
+          platform: "win32",
+          arch: "x64",
           pythonAbi,
         }),
       ).rejects.toThrow("Unsupported font matching Python ABI");
@@ -64,7 +66,9 @@ describe("approved C23 runtime binding", () => {
   );
   it("passes the actual release digest, cancellation and progress to the installer", async () => {
     const options = {
-      pythonAbi: process.platform === "win32" ? "cpython-314" : "cpython-312",
+      platform: "win32" as const,
+      arch: "x64",
+      pythonAbi: "cpython-314",
       paths: {
         dataRoot: resolve(tmpdir(), `fc23-${randomUUID()}`),
         runtimeDir: resolve("src/main/runtime"),
@@ -75,7 +79,11 @@ describe("approved C23 runtime binding", () => {
     await expect(prepareFontChapterRuntime(options)).rejects.toThrow(
       "network unavailable",
     );
-    const resolved = resolveFontChapterRuntimeManifest();
+    const resolved = resolveFontChapterRuntimeManifest(
+      "win32",
+      "x64",
+      "cpython-314",
+    );
     expect(download).toHaveBeenCalledWith(
       expect.objectContaining({
         url: resolved.url,

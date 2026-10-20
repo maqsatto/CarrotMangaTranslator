@@ -5,6 +5,7 @@ import { createAutomaticFontChapterCoordinatorV2 } from "../pipeline/automaticFo
 import { configureWholePageOutputOptions } from "../pipeline/wholePageOutputOptions";
 import { prepareAnalysisRun } from "../pipeline/prepareAnalysisRun";
 import { prepareFontMatchingRuntimeForRun } from "../pipeline/fontMatchingRuntimeAssets";
+import { isFontChapterRuntimeSupported } from "../pipeline/fontChapterRuntimeAssets";
 import {
   finalizePreparedPageResult,
   type PreparedPageBuildResult,
@@ -23,12 +24,17 @@ export function createWorkflowTypography(context: PageWorkflowRuntimeContext) {
       const pages = chapter.pages.filter(
         (page) => pageIds.includes(page.id) && page.blocks.length > 0,
       );
-      if (!pages.length || (!context.plan.autoFont && !context.plan.autoSize))
+      const automaticFontMatching =
+        context.plan.autoFont && isFontChapterRuntimeSupported();
+      if (
+        !pages.length ||
+        (!automaticFontMatching && !context.plan.autoSize)
+      )
         return;
       const runPaths = await context.runPaths(chapter.id);
       await prepareFontMatchingRuntimeForRun(
         {
-          autoFontMatching: context.plan.autoFont,
+          autoFontMatching: automaticFontMatching,
           signal: context.signal,
           jobId: context.runId,
           emit: context.emit,
@@ -47,7 +53,7 @@ export function createWorkflowTypography(context: PageWorkflowRuntimeContext) {
         dependencies: context.dependencies,
       });
       await configureWholePageOutputOptions({
-        autoFontMatching: context.plan.autoFont,
+        autoFontMatching: automaticFontMatching,
         aiFontSizeMatching: context.plan.autoSize,
         chapterId: chapter.id,
         workId: chapter.workId,
@@ -69,7 +75,7 @@ export function createWorkflowTypography(context: PageWorkflowRuntimeContext) {
           pageOptions: prepared.pageOptions,
         };
       });
-      sourceStyleFor = context.plan.autoFont
+      sourceStyleFor = automaticFontMatching
         ? await context.dependencies.fontMatching.chapter?.prepare(
             inputs,
             context.signal,

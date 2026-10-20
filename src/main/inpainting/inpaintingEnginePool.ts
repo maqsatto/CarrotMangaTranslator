@@ -18,6 +18,10 @@ import {
   acquireKoharuInpaintingEngine,
   disposeCachedKoharuInpaintingEngine,
 } from "./koharuEnginePool";
+import {
+  acquireLamaInpaintingEngine,
+  disposeCachedLamaInpaintingEngine,
+} from "./lamaEnginePool";
 import { normalizeComputeGpuIndex } from "../../shared/gpuSettings";
 import { assertModelCleanupComplete } from "../runtimeSupport/modelCleanupBarrier";
 
@@ -32,15 +36,21 @@ export type InpaintingEnginePoolDependencies = {
   acquireKoharu: (
     options: Parameters<typeof acquireKoharuInpaintingEngine>[0],
   ) => Promise<InpaintingEngineLease>;
+  acquireLama?: (
+    options: Parameters<typeof acquireLamaInpaintingEngine>[0],
+  ) => Promise<InpaintingEngineLease>;
   disposeFlux: (reason: string) => Promise<boolean>;
   disposeKoharu: (reason: string) => Promise<boolean>;
+  disposeLama?: (reason: string) => Promise<boolean>;
   totalMemoryBytes: () => number;
 };
 const defaultDependencies: InpaintingEnginePoolDependencies = {
   acquireFlux: acquireFluxInpaintingEngine,
   acquireKoharu: acquireKoharuInpaintingEngine,
+  acquireLama: acquireLamaInpaintingEngine,
   disposeFlux: disposeCachedFluxInpaintingEngine,
   disposeKoharu: disposeCachedKoharuInpaintingEngine,
+  disposeLama: disposeCachedLamaInpaintingEngine,
   totalMemoryBytes: totalmem,
 };
 export const FLUX_RECOMMENDED_UNIFIED_MEMORY_MB = 16 * 1024;
@@ -86,6 +96,9 @@ async function acquireNativeEngine(
   assertModelCleanupComplete();
   options.signal?.throwIfAborted();
   const computeGpuIndex = normalizeComputeGpuIndex(options.computeGpuIndex);
+  if (options.model === "lama-manga" && process.platform === "linux") {
+    return acquireLinuxLamaEngine(options, dependencies, computeGpuIndex);
+  }
   if (options.model === "flux-klein") {
     assertFluxMemoryPolicy({
       backend:
@@ -121,6 +134,30 @@ async function acquireNativeEngine(
       onProgress: options.onProgress,
     }),
     dependencies.disposeKoharu,
+  );
+}
+
+async function acquireLinuxLamaEngine(
+  options: Parameters<typeof acquireInpaintingEngine>[0],
+  dependencies: InpaintingEnginePoolDependencies,
+  computeGpuIndex: number | undefined,
+): Promise<InpaintingEngineLease> {
+  if (!dependencies.acquireLama || !dependencies.disposeLama) {
+    throw new Error("LaMa Linux backend is not configured.");
+  }
+  await dependencies.disposeFlux("switch-to-lama");
+  await dependencies.disposeKoharu("switch-to-lama");
+  options.signal?.throwIfAborted();
+  return workloadLease(
+    await dependencies.acquireLama({
+      appPaths: options.appPaths,
+      model: "lama-manga",
+      backend: options.koharuBackend ?? "auto",
+      computeGpuIndex,
+      signal: options.signal,
+      onProgress: options.onProgress,
+    }),
+    dependencies.disposeLama,
   );
 }
 
@@ -166,6 +203,7 @@ export async function disposeCachedInpaintingEngines(
   const settled = await Promise.allSettled([
     dependencies.disposeFlux(reason),
     dependencies.disposeKoharu(reason),
+    ...(dependencies.disposeLama ? [dependencies.disposeLama(reason)] : []),
   ]);
   const errors = settled.flatMap((result) =>
     result.status === "rejected" ? [result.reason] : [],

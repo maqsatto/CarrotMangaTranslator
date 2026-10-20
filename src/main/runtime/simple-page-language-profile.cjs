@@ -41,6 +41,7 @@ const LANGUAGE_CODE_ALIASES = {
 const PROMPT_LANGUAGE_NAMES = {
   ja: "Japanese",
   ko: "Korean",
+  kk: "Kazakh",
   en: "English",
   "zh-Hans": "Simplified Chinese",
   "zh-Hant": "Traditional Chinese",

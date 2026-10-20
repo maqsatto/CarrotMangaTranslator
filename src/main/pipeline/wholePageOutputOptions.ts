@@ -1,5 +1,6 @@
 import { applyOutputOptions } from "./options";
 import { prepareAnalysisRun } from "./prepareAnalysisRun";
+import { isFontChapterRuntimeSupported } from "./fontChapterRuntimeAssets";
 import {
   safelyLoadFontMatchingCandidates,
   safelyLoadFontMatchingProfile,
@@ -23,14 +24,16 @@ export async function configureWholePageOutputOptions({
   run: Awaited<ReturnType<typeof prepareAnalysisRun>>;
   workId?: string;
 }): Promise<void> {
-  const profileLoad = autoFontMatching
+  const automaticFontMatching =
+    autoFontMatching && isFontChapterRuntimeSupported();
+  const profileLoad = automaticFontMatching
     ? await safelyLoadFontMatchingProfile(dependencies, workId)
     : { status: "absent" as const, profile: null };
   // A missing profile is a normal first-run state. A profile read/parse error
   // is different: silently continuing would discard anchors and user locks,
   // so matching is disabled for this run.
   const fontMatchingEnabled =
-    autoFontMatching && profileLoad.status !== "error";
+    automaticFontMatching && profileLoad.status !== "error";
   const candidates = fontMatchingEnabled
     ? safelyLoadFontMatchingCandidates(
         dependencies,

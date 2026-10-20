@@ -1,5 +1,5 @@
 // @ts-check
-const { existsSync, statSync } = require("node:fs");
+const { existsSync, readFileSync, statSync } = require("node:fs");
 const path = require("node:path");
 
 const {
@@ -11,14 +11,33 @@ const { resolveToolsDir } = require("../model/runtime-locations.cjs");
 
 /** @typedef {import("../runtime-jsdoc-types").RuntimeOptions & { ffmpegPath?: string | null; toolsDir?: string | null }} RuntimePathOptions */
 
+/** @param {string} toolsDir @returns {string | null} */
+function systemFfmpegCandidate(toolsDir) {
+  try {
+    const metadata = JSON.parse(
+      readFileSync(
+        path.join(toolsDir || "", "ffmpeg", "ffmpeg-runtime.json"),
+        "utf8",
+      ),
+    );
+    return metadata?.source === "system" &&
+      typeof metadata.path === "string"
+      ? metadata.path
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 /** @param {string} toolsDir */
 function bundledFfmpegCandidates(toolsDir) {
   const binaryName = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
   return [
+    systemFfmpegCandidate(toolsDir),
     path.join(toolsDir || "", "ffmpeg", binaryName),
     path.join(toolsDir || "", "ffmpeg", "bin", binaryName),
     path.join(toolsDir || "", binaryName),
-  ];
+  ].filter((candidate) => typeof candidate === "string");
 }
 
 /** @param {RuntimePathOptions} [options] */

@@ -51,6 +51,7 @@ export const DEFAULT_TRANSLATION_LANGUAGE_SETTINGS: TranslationLanguageSettings 
 export const KNOWN_TRANSLATION_LANGUAGES = [
   { code: "ja", labelKo: "일본어", promptName: "Japanese" },
   { code: "ko", labelKo: "한국어", promptName: "Korean" },
+  { code: "kk", labelKo: "카자흐어", promptName: "Kazakh" },
   { code: "en", labelKo: "영어", promptName: "English" },
   { code: "zh-Hans", labelKo: "중국어 간체", promptName: "Simplified Chinese" },
   {

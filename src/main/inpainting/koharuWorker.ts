@@ -25,6 +25,8 @@ type KoharuWorkerRequestSummary = {
 
 type KoharuWorkerOptions = {
   requestTimeoutMs?: number;
+  /** Human-readable worker name for errors; defaults to the Koharu label. */
+  workerName?: string;
 };
 
 type KoharuWorkerCommand = {
@@ -39,24 +41,26 @@ type KoharuWorkerCommand = {
 
 export class KoharuWorker {
   private readonly client: JsonLinesWorkerClient<KoharuWorkerCommand>;
+  private readonly workerName: string;
 
   constructor(
     private readonly launch: KoharuWorkerLaunchSpec,
     options: KoharuWorkerOptions = {},
   ) {
+    this.workerName = options.workerName ?? "Koharu 인페인팅 런타임";
     this.client = new JsonLinesWorkerClient({
       executable: launch.executable,
       args: launch.args,
       env: buildKoharuWorkerEnv(launch),
-      workerName: "Koharu 인페인팅 런타임",
+      workerName: this.workerName,
       requestTimeoutMs: options.requestTimeoutMs,
       buildExitError: (code, stderr) =>
         new Error(
-          `Koharu 인페인팅 런타임이 종료되었습니다 (${code}). ${formatKoharuRuntimeDetail(stderr)}`,
+          `${this.workerName}이 종료되었습니다 (${code}). ${formatKoharuRuntimeDetail(stderr)}`,
         ),
       buildNotRunningError: (stderr) =>
         new Error(
-          `Koharu 인페인팅 런타임이 실행 중이 아닙니다. ${formatKoharuRuntimeDetail(stderr)}`,
+          `${this.workerName}이 실행 중이 아닙니다. ${formatKoharuRuntimeDetail(stderr)}`,
         ),
       sanitizeStderr: sanitizeKoharuRuntimeStderr,
       onStderr: (text) => logKoharuRuntimeStderr(text, launch),
@@ -142,7 +146,7 @@ export class KoharuWorker {
       ...request,
     });
     throw new Error(
-      `Koharu 인페인팅 실패: ${response.error ?? "알 수 없는 오류"} ${formatKoharuRuntimeDetail(this.client.getStderr())}`,
+      `${this.workerName.replace(/ 런타임$/, "")} 실패: ${response.error ?? "알 수 없는 오류"} ${formatKoharuRuntimeDetail(this.client.getStderr())}`,
     );
   }
 }

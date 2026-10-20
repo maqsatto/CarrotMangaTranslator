@@ -367,7 +367,7 @@ function buildFixedBlockTranslationPrompt(plan, options = {}) {
     options.autoFontMatching
       ? 'layoutIntent must be exactly "auto", "horizontal", or "vertical" and is only a render advisory; it never changes source direction, bbox, grouping, or inpainting geometry.'
       : 'layoutIntent must be exactly "auto" or "horizontal". Never return "vertical" because this response has no current visual-role confidence evidence. It never changes source direction, bbox, grouping, or inpainting geometry.',
-    'Use layoutIntent "horizontal" by default. Korean ordinary speech balloons, dialogue, thought, signs, labels, titles, and normal captions should remain horizontal even when the Japanese source is vertical. Do not use "auto" merely because the source is vertical.',
+    `Use layoutIntent "horizontal" by default. ${profile.targetName} ordinary speech balloons, dialogue, thought, signs, labels, titles, and normal captions should remain horizontal even when the Japanese source is vertical. Do not use "auto" merely because the source is vertical.`,
     ...(options.autoFontMatching
       ? [
           'Use layoutIntent "vertical" extremely sparingly: only for a genuinely long ordinary explanatory caption or narration column that is visibly very tall, very narrow, outside speech balloons, placed along the outer edge of the manga page, and classified in this same response as fontRole "narration" with finite fontRoleConfidence >= 0.82. Never use it for sound effects or text inside a balloon.',
@@ -379,6 +379,11 @@ function buildFixedBlockTranslationPrompt(plan, options = {}) {
     "ko must faithfully translate the complete text belonging to its block without losing the opening phrase, modifiers, negation, names, numbers, honorifics, register, modality, or final predicate.",
     "ko must be one plain continuous line with natural target-language spaces. The renderer performs visual wrapping.",
     `Write each ko value in natural ${profile.targetName}, using normal spelling and notation.`,
+    ...(profile.isDefaultJapaneseToKorean
+      ? []
+      : [
+          `The JSON field name "ko" is a fixed schema key. Its value must be written only in ${profile.targetName}; do not output Korean or any other target language.`,
+        ]),
     ...(profile.isDefaultJapaneseToKorean
       ? [
           "Use normal Korean notation, including Latin letters and Arabic numerals where conventional (Aランク → A랭크, 1856年 → 1856년). Translate Japanese words, but do not phonetically spell out such labels or numbers in Hangul.",
@@ -409,6 +414,11 @@ function buildFixedBlockTranslationPrompt(plan, options = {}) {
     `fixedBlocks=${JSON.stringify(
       plan.blocks.map((block) => compactFixedBlock(block, options)),
     )}`,
+    ...(profile.isDefaultJapaneseToKorean
+      ? []
+      : [
+          `FINAL RULE: Every "ko" value MUST be written in natural ${profile.targetName}. The source is ${profile.sourceName}, not ${profile.targetName}. Translate into ${profile.targetName}; do not answer in Korean or any other language.`,
+        ]),
   ]
     .filter(Boolean)
     .join("\n");

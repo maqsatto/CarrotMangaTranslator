@@ -4,13 +4,28 @@ import approved from "./fontChapterC18Manifest.json";
 import release from "./fontChapterReleaseManifest.json";
 import { installFontChapterAssets } from "./fontChapterAssetInstaller";
 
+type SupportedFontChapterRuntimeKey = "win32-x64" | "darwin-arm64";
+
+function isSupportedFontChapterRuntimeKey(
+  key: string,
+): key is SupportedFontChapterRuntimeKey {
+  return key === "win32-x64" || key === "darwin-arm64";
+}
+
+export function isFontChapterRuntimeSupported(
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch,
+): boolean {
+  return isSupportedFontChapterRuntimeKey(`${platform}-${arch}`);
+}
+
 export function resolveFontChapterRuntimeManifest(
   platform: NodeJS.Platform = process.platform,
   arch: string = process.arch,
   pythonAbi: string = platform === "win32" ? "cpython-314" : "cpython-312",
 ) {
   const key = `${platform}-${arch}`;
-  if (key !== "win32-x64" && key !== "darwin-arm64")
+  if (!isSupportedFontChapterRuntimeKey(key))
     throw new Error(`Unsupported font matching platform: ${key}`);
   if (
     pythonAbi !== "cpython-312" &&
@@ -44,12 +59,14 @@ export function resolveFontChapterRuntimeManifest(
 export async function prepareFontChapterRuntime(options: {
   paths: Pick<AppPaths, "dataRoot" | "runtimeDir">;
   pythonAbi: string;
+  platform?: NodeJS.Platform;
+  arch?: string;
   signal?: AbortSignal;
   onProgress?: (progress: RuntimeAssetProgress) => void;
 }) {
   const resolved = resolveFontChapterRuntimeManifest(
-    process.platform,
-    process.arch,
+    options.platform ?? process.platform,
+    options.arch ?? process.arch,
     options.pythonAbi,
   );
   const assets = await installFontChapterAssets({ ...options, ...resolved });

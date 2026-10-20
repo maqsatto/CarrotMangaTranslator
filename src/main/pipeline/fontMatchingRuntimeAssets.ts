@@ -36,6 +36,7 @@ import {
   type RuntimeAssetProgress,
 } from "../runtimeSupport/modelDownloads";
 import type { PipelineOptions } from "./types";
+import { isFontChapterRuntimeSupported } from "./fontChapterRuntimeAssets";
 import {
   ensureCrossScriptProxyRuntimeAssets,
   hasCompleteBundledCrossScriptProxyRuntime,
@@ -299,7 +300,12 @@ export async function prepareFontMatchingRuntimeForRun(
   paths: Pick<AppPaths, "dataRoot" | "runtimeDir">,
   injected: boolean,
 ): Promise<void> {
-  if (!options.autoFontMatching || injected) return;
+  if (
+    !options.autoFontMatching ||
+    injected ||
+    !isFontChapterRuntimeSupported()
+  )
+    return;
   try {
     await prepareFontMatchingRuntime({
       paths,

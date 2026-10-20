@@ -16,6 +16,7 @@ tmp-*.png
 tmp/
 /runtime/
 /ocr-runtime/
+/inpaint-runtime/
 /or/
 tools/.downloads/
 tools/llama-b*/
